@@ -12,6 +12,11 @@ The scene is a rotating cube and the container's bounds as a wireframe. A white 
 container between **bounded** and **immersive** mode when you point at it and pinch. A Compose XR
 panel shows the current mode and backend and has buttons for both switches.
 
+![The OpenXR spatial container (rotating cube, bounds wireframe, white toggle cube) next to the Compose XR control panel](docs/images/side-by-side.webp)
+
+*The OpenXR spatial container in bounded mode, next to the Compose XR control panel, on an XREAL
+Aura. Both render correctly when they don't overlap.*
+
 ## Requirements
 
 - An Android XR device that supports `XR_EXT_spatial_container`. It was tested on the XREAL Aura.
@@ -64,9 +69,28 @@ MainActivity (Compose XR, Full Space Managed)
 ## Known limitation
 
 The Android XR compositor draws the spatial container **over** Compose XR panels whatever their
-distance. Submitting layer depth doesn't change that: the result is the same with the Vulkan backend
-and native depth swapchains. Until the platform fixes it, place panels beside the container rather
-than in front of it.
+distance.
+
+![The Compose XR panel is closer to the viewer than the container, yet the cube, the toggle cube and the bounds wireframe are drawn over it](docs/images/occlusion-limitation.webp)
+
+*Here the Compose XR panel is in front of the container, closer to the viewer. It should hide the
+lower part of the cube, the white toggle cube and the wireframe. All three are drawn over the panel,
+which covers its "Switch to Vulkan" button.*
+
+The compositor doesn't use depth to sort the container's layer against system panels. It always
+puts the container's layer on top. We checked whether our depth submission was at fault:
+
+| Backend | Swapchains | Layer depth (`XR_KHR_composition_layer_depth`) | Panel in front of the container |
+|---|---|---|---|
+| WebGPU (Dawn) | Android surface swapchain, colour only | not submitted | overdrawn by the container |
+| Vulkan | runtime-owned colour (`R8G8B8A8_UNORM`) and depth (`D32_SFLOAT`) | submitted on every frame (near 0.05 m, far 100 m) | overdrawn by the container |
+
+The Vulkan backend submits depth exactly as the OpenXR specification describes, and the result is
+the same as without depth. So the cause is on the platform side, not in the app. Until the platform
+fixes it:
+
+- Place Compose XR panels **beside** the container, not in front of it, as in the first screenshot.
+- Or draw the UI inside the container yourself, so it is depth-tested with the 3D content.
 
 ## License
 
